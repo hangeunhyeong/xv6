@@ -42,7 +42,7 @@ enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 proc.h에 정의 되어있는 procstate이다.
 
 
-
+---
 2. sys_getprocinfo() 구현
 ```
 //과제1 - kernel implementation
@@ -69,6 +69,8 @@ userspace에 myproc()이 반환하는 proc구조체 포인터변수를 그대로
 
 
 
+
+
 ```
 int argptr(int n, char **pp, int size)
 ```
@@ -82,43 +84,47 @@ size : pp가 가리키는 구조체의 크기
 
 
 
+
+
 user space에 넘겨줄 myprocinfo 포인터변수가 가리키는 변수가 사용자공간 내에 있는지 확인
 
 예외상황 : getprocinfo의 0번째 인자가 user space 내에 없는경우
 
 
-
+---
 3. system call 테이블에 sys_getprocinfo() 추가하고 syscall.h에 시스템콜 번호 선언하기
 
 - syscall.c
 
-```extern int sys_getprocinfo(void); //과제 1 - system call table```
+  ```extern int sys_getprocinfo(void); //과제 1 - system call table```
 
-```[SYS_getprocinfo] sys_getprocinfo, //과제 1 - system call table```
+  ```[SYS_getprocinfo] sys_getprocinfo, //과제 1 - system call table```
 
 
 
 - syscall.h
 
-```#define SYS_getprocinfo 22 //과제 1```
+  ```#define SYS_getprocinfo 22 //과제 1```
 
 
 
 
+
+---
 4. user space에서 호출할 getprocinfo(struct procinfo*) user.h와 usys.S에 정의하기
 
 - usys.S
 
-```SYSCALL(getprocinfo) //과제1```
+  ```SYSCALL(getprocinfo) //과제1```
 
 - user.h
 
-```int getprocinfo(struct procinfo*); //과제1 - userspace wrapper```
+  ```int getprocinfo(struct procinfo*); //과제1 - userspace wrapper```
 
 
 
 
-
+---
 5. procinfotest.c 작성
 
 예외 : 현재 프로세스의 부모프로세스가 없는경우(e.g. init) 
@@ -132,14 +138,18 @@ else
 printf(1, "Parent Process ID: %d\n", curprocinfo->ppid);
 ```
 
+
 user가 procinfotest명령어를 입력하면 sh.c파일에서 프로세스를 새로 형성하기 때문에 procinfotest.c의 메인함수에서 반드시 exit()을 해주어야한다.
 
 
-
+---
 procinfotest는 명령어를 입력할때마다 새로운 프로세스가 형성되기 때문에 결과는 다음과 같이 나온다.
+
+
 ![결과 이미지](https://github.com/hangeunhyeong/xv6/blob/main/TalkMedia_i_5dcb12ba3e0d.png)
 
 ---
+##정리
 
 shell에서의 사용자의 입력으로 fork()가 실행되면서 자식프로세스 생성됨 ->
 
