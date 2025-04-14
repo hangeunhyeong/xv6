@@ -89,3 +89,22 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+//과제1 - kernel implementation
+int
+sys_getprocinfo(void){
+    struct procinfo *myprocinfo;
+    struct proc *curproc = myproc(); 
+    
+    // n번째 인자의 메모리주소가 사용자 공간 내에 있는지 확인하는 함수
+    if(argptr(0, (char **)&myprocinfo, sizeof(struct procinfo)) < 0){
+      return -1;
+    }
+    myprocinfo->pid = curproc->pid;
+    //현재 프로세스의 부모가 없을경우(e.g. init)
+    myprocinfo->ppid = (curproc->parent) ? curproc->parent->pid : -1;
+    myprocinfo->state = curproc->state;
+    myprocinfo->sz = curproc->sz;
+
+    return 0;
+}

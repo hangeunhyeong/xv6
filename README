@@ -1,51 +1,146 @@
-NOTE: we have stopped maintaining the x86 version of xv6, and switched
-our efforts to the RISC-V version
-(https://github.com/mit-pdos/xv6-riscv.git)
+우선 xv6에서 system call이 어떻게 내부적으로 동작하는지 알아야한다.
 
-xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
-Version 6 (v6).  xv6 loosely follows the structure and style of v6,
-but is implemented for a modern x86-based multiprocessor using ANSI C.
 
-ACKNOWLEDGMENTS
 
-xv6 is inspired by John Lions's Commentary on UNIX 6th Edition (Peer
-to Peer Communications; ISBN: 1-57398-013-7; 1st edition (June 14,
-2000)). See also https://pdos.csail.mit.edu/6.828/, which
-provides pointers to on-line resources for v6.
+## 파일의 역할
 
-xv6 borrows code from the following sources:
-    JOS (asm.h, elf.h, mmu.h, bootasm.S, ide.c, console.c, and others)
-    Plan 9 (entryother.S, mp.h, mp.c, lapic.c)
-    FreeBSD (ioapic.c)
-    NetBSD (console.c)
+sysproc.c : systemcall 함수가 구현되어있는곳
 
-The following people have made contributions: Russ Cox (context switching,
-locking), Cliff Frey (MP), Xiao Yu (MP), Nickolai Zeldovich, and Austin
-Clements.
+syscall.c : systemcall table이 있는곳, 각각의 system call 함수를 숫자로 나타내고있다.
 
-We are also grateful for the bug reports and patches contributed by Silas
-Boyd-Wickizer, Anton Burtsev, Cody Cutler, Mike CAT, Tej Chajed, eyalz800,
-Nelson Elhage, Saar Ettinger, Alice Ferrazzi, Nathaniel Filardo, Peter
-Froehlich, Yakir Goaron,Shivam Handa, Bryan Henry, Jim Huang, Alexander
-Kapshuk, Anders Kaseorg, kehao95, Wolfgang Keller, Eddie Kohler, Austin
-Liew, Imbar Marinescu, Yandong Mao, Matan Shabtay, Hitoshi Mitake, Carmi
-Merimovich, Mark Morrissey, mtasm, Joel Nider, Greg Price, Ayan Shafqat,
-Eldar Sehayek, Yongming Shen, Cam Tenny, tyfkda, Rafael Ubal, Warren
-Toomey, Stephen Tu, Pablo Ventura, Xi Wang, Keiichi Watanabe, Nicolas
-Wolovick, wxdao, Grant Wu, Jindong Zhang, Icenowy Zheng, and Zou Chang Wei.
+syscall.h : system call 번호 정의
 
-The code in the files that constitute xv6 is
-Copyright 2006-2018 Frans Kaashoek, Robert Morris, and Russ Cox.
+user.h : user level에서 호출하는 함수를 정의하고 있는곳
 
-ERROR REPORTS
+usys.S : user level에서 호출하는 함수를 감싸고 있는곳
 
-We don't process error reports (see note on top of this file).
 
-BUILDING AND RUNNING XV6
 
-To build xv6 on an x86 ELF machine (like Linux or FreeBSD), run
-"make". On non-x86 or non-ELF machines (like OS X, even on x86), you
-will need to install a cross-compiler gcc suite capable of producing
-x86 ELF binaries (see https://pdos.csail.mit.edu/6.828/).
-Then run "make TOOLPREFIX=i386-jos-elf-". Now install the QEMU PC
-simulator and run "make qemu".
+usys.S를 통해 user.h에 정의되어있는 함수가 sysproc.c 내부에 있는 sys_명령어()의 형태로 커널내부에서 필요한 정보를 가져올 수 있는것이다.
+
+
+
+사용자 프로그램에서 시스템 콜 함수를 호출하면 해당 인자들이 사용자 스택에 저장되고 system call 진입시 이 스택에서 몇번째 인자인지를 기준으로 꺼낸다
+
+argptr, argint의 경우 이 인수가 올바른 사용자 영역에 있는지 검사하고 그 메모리 주소를 커널이 사용할 수 있게 넘겨주는 역할을 한다.
+
+---
+
+1. proc.h에 procinfo 구조체를 정의한다.
+
+struct procinfo{
+int pid; //process id
+int ppid; //parent process id
+int state; //process state
+uint sz; //memory size
+}
+
+
+프로세스 상태값은 enum이지만 상태를 문자열로 출력하기 위해 process state값을 int로 하였다.
+
+enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
+proc.h에 정의 되어있는 procstate이다.
+
+
+
+2. sys_getprocinfo() 구현
+
+//과제1 - kernel implementation
+int
+sys_getprocinfo(void){
+struct procinfo *myprocinfo;
+struct proc *curproc = myproc();
+
+// n번째 인자의 메모리주소가 사용자 공간 내에 있는지 확인하는 함수
+if(argptr(0, (char **)&myprocinfo, sizeof(struct procinfo)) < 0){
+return -1;
+}
+
+myprocinfo->pid = curproc->pid;
+//현재 프로세스의 부모가 없을경우(e.g. init)
+myprocinfo->ppid = (curproc->parent) ? curproc->parent->pid : -1;
+myprocinfo->state = curproc->state;
+myprocinfo->sz = curproc->sz;
+
+return 0;
+}
+userspace에 myproc()이 반환하는 proc구조체 포인터변수를 그대로 반환하면 call by reference를 하게되므로 userspace에서 kernel내부 변수에 접근가능하게 된다. 그렇게 되면 안되므로 myprocinfo에 현재 프로세스의 정보값을 다시 새로운 구조체 변수에 담아준다.  또한, 정보를 담는 myprocinfo포인터변수의 위치가 커널공간에 있으면 안되므로 argptr함수를 이용하여 예외처리를 해준다.
+
+
+
+**int argptr(int n, char **pp, int size)**
+n : 현재 systemcall함수(sys_procinfo())를 호출한 함수의 n번째 parameter를 의미한다.
+
+*호출함수 : int getprocinfo(struct procinfo*); 
+
+pp : user space 내에 있는지 검사할 포인터변수 대상
+
+size : pp가 가리키는 구조체의 크기
+
+
+
+user space에 넘겨줄 myprocinfo 포인터변수가 가리키는 변수가 사용자공간 내에 있는지 확인
+
+예외상황 : getprocinfo의 0번째 인자가 user space 내에 없는경우
+
+
+
+3. system call 테이블에 sys_getprocinfo() 추가하고 syscall.h에 시스템콜 번호 선언하기
+
+- syscall.c
+
+extern int sys_getprocinfo(void); //과제 1 - system call table
+
+[SYS_getprocinfo] sys_getprocinfo, //과제 1 - system call table
+
+
+
+- syscall.h
+
+#define SYS_getprocinfo 22 //과제 1
+
+
+
+
+4. user space에서 호출할 getprocinfo(struct procinfo*) user.h와 usys.S에 정의하기
+
+- usys.S
+
+SYSCALL(getprocinfo) //과제1
+
+- user.h
+
+int getprocinfo(struct procinfo*); //과제1 - userspace wrapper
+
+
+
+
+
+5. procinfotest.c 작성
+
+예외 : 현재 프로세스의 부모프로세스가 없는경우(e.g. init) 
+
+예외 상황의 경우 Parent Process Id 가 -1로 반환된다. 다음과 같이 예외처리를 해주었다.
+
+if(curprocinfo->ppid == -1)
+printf(1, "Process %d has no parent process\n", curprocinfo->pid);
+else
+printf(1, "Parent Process ID: %d\n", curprocinfo->ppid);
+
+
+user가 procinfotest명령어를 입력하면 sh.c파일에서 프로세스를 새로 형성하기 때문에 procinfotest.c의 메인함수에서 반드시 exit()을 해주어야한다.
+
+
+
+procinfotest는 명령어를 입력할때마다 새로운 프로세스가 형성되기 때문에 결과는 다음과 같이 나온다.
+![결과 이미지]()
+
+
+
+shell에서의 사용자의 입력으로 fork()가 실행되면서 자식프로세스 생성됨 ->
+
+getprocinfo()호출 (user level) ->
+
+user.h, usys.S, syscall.h에 정의된 시스템콜 번호가 mapping됨 ->
+
+sys_getprocinfo() 호출 후 수행(kernel space) -> 종료
