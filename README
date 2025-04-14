@@ -133,7 +133,7 @@ user가 procinfotest명령어를 입력하면 sh.c파일에서 프로세스를 �
 
 
 procinfotest는 명령어를 입력할때마다 새로운 프로세스가 형성되기 때문에 결과는 다음과 같이 나온다.
-![결과 이미지]()
+![결과 이미지](https://github.com/hangeunhyeong/xv6/blob/main/TalkMedia_i_5dcb12ba3e0d.png.png)
 
 
 
